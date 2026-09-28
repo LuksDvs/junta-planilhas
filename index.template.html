@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Junta Planilhas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --papel: #F2F4F1;
+    --folha: #FFFFFF;
+    --tinta: #17241D;
+    --tinta-2: #4A5A50;
+    --tinta-3: #7A887F;
+    --linha: #CBD4CD;
+    --linha-2: #E3E8E4;
+    --verde: #1D6B45;
+    --verde-escuro: #14512F;
+    --verde-claro: #DCEBDF;
+    --ambar: #8A5200;
+    --ambar-fundo: #FBF1DC;
+    --erro: #A3261B;
+    --erro-fundo: #FBE7E4;
+    --fonte: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--papel);
+    color: var(--tinta);
+    font: 15px/1.5 var(--fonte);
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+  .pagina { max-width: 880px; margin: 0 auto; padding: 40px 20px 64px; }
+
+  header { margin-bottom: 32px; }
+  h1 { font-size: 30px; line-height: 1.15; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+  .sub { margin: 8px 0 0; color: var(--tinta-2); max-width: 60ch; }
+
+  .etapa { background: var(--folha); border: 1px solid var(--linha); border-radius: 6px; margin-bottom: 20px; }
+  .etapa > .cab { display: flex; align-items: baseline; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--linha-2); }
+  .etapa > .cab .num {
+    flex: none; width: 26px; height: 26px; border-radius: 3px; background: var(--tinta); color: #fff;
+    font-weight: 600; font-size: 13px; display: grid; place-items: center; transform: translateY(-1px);
+  }
+  .etapa > .cab h2 { font-size: 17px; font-weight: 600; margin: 0; }
+  .etapa > .cab .extra { margin-left: auto; font-size: 13px; color: var(--tinta-2); }
+  .corpo { padding: 20px; }
+
+  /* Área de soltar */
+  .soltar {
+    display: block; border: 1.5px dashed var(--linha); border-radius: 4px; padding: 28px 20px;
+    text-align: center; cursor: pointer; background:
+      linear-gradient(var(--linha-2) 1px, transparent 1px) 0 0 / 100% 28px,
+      linear-gradient(90deg, var(--linha-2) 1px, transparent 1px) 0 0 / 96px 100%;
+  }
+  .soltar:hover, .soltar.ativa { border-color: var(--verde); background-color: var(--verde-claro); }
+  .soltar:focus-within { outline: 2px solid var(--verde); outline-offset: 2px; }
+  .soltar strong { display: block; font-size: 16px; }
+  .soltar span { color: var(--tinta-2); font-size: 14px; }
+  .soltar .botao { margin-top: 14px; pointer-events: none; color: #fff; font-size: 14px; }
+  .soltar input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+
+  /* Barra de progresso em células */
+  .progresso { margin-top: 18px; }
+  .progresso[hidden] { display: none; }
+  .progresso .topo { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; margin-bottom: 6px; }
+  .progresso .topo .rotulo { color: var(--tinta-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .progresso .topo .pct { font-weight: 700; font-size: 15px; color: var(--verde-escuro); }
+  .celulas { display: grid; grid-template-columns: repeat(25, 1fr); border: 1px solid var(--tinta); border-radius: 2px; overflow: hidden; height: 22px; }
+  .celulas i { display: block; border-right: 1px solid var(--linha); background: var(--folha); position: relative; }
+  .celulas i:last-child { border-right: 0; }
+  .celulas i b { position: absolute; inset: 0; background: var(--verde); transform-origin: left; transform: scaleX(0); transition: transform .12s linear; }
+  @media (prefers-reduced-motion: reduce) { .celulas i b { transition: none; } }
+
+  /* Lista de arquivos */
+  .lista { list-style: none; margin: 18px 0 0; padding: 0; border-top: 1px solid var(--linha-2); }
+  .lista li { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 10px 0; border-bottom: 1px solid var(--linha-2); }
+  .lista .nome { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lista .info { grid-column: 1; font-size: 13px; color: var(--tinta-2); }
+  .lista .info.erro { color: var(--erro); }
+  .lista .fina { grid-column: 1 / -1; height: 4px; background: var(--linha-2); border-radius: 2px; overflow: hidden; }
+  .lista .fina b { display: block; height: 100%; background: var(--verde); }
+  .lista .remover { grid-row: 1 / span 2; grid-column: 2; align-self: center; }
+  .acoes-lista { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; color: var(--tinta-2); }
+
+  /* Botões */
+  .botao {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; font: 600 14px/1 var(--fonte);
+    padding: 11px 18px; border-radius: 4px; border: 1px solid var(--tinta); background: var(--tinta); color: #fff; cursor: pointer;
+  }
+  .botao:hover { background: #000; }
+  .botao.primario { background: var(--verde); border-color: var(--verde); }
+  .botao.primario:hover { background: var(--verde-escuro); }
+  .botao:disabled { background: var(--linha-2); border-color: var(--linha); color: var(--tinta-3); cursor: not-allowed; }
+  .link { background: none; border: 0; padding: 4px 6px; font: 500 13px var(--fonte); color: var(--tinta-2); cursor: pointer; border-radius: 3px; text-decoration: underline; text-underline-offset: 2px; }
+  .link:hover { color: var(--tinta); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--verde); outline-offset: 2px; }
+
+  /* Opções */
+  .modos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .modo { position: relative; display: block; border: 1px solid var(--linha); border-radius: 4px; padding: 12px 14px; cursor: pointer; }
+  .modo input { position: absolute; opacity: 0; }
+  .modo strong { display: block; font-size: 14px; }
+  .modo span { display: block; font-size: 13px; color: var(--tinta-2); margin-top: 3px; line-height: 1.4; }
+  .modo:has(input:checked) { border-color: var(--verde); box-shadow: inset 0 0 0 1px var(--verde); background: var(--verde-claro); }
+  .modo:has(input:focus-visible) { outline: 2px solid var(--verde); outline-offset: 2px; }
+  .marcas { margin-top: 18px; display: grid; gap: 10px; }
+  .marca { display: grid; grid-template-columns: 18px 1fr; gap: 10px; cursor: pointer; }
+  .marca input { width: 16px; height: 16px; margin: 3px 0 0; accent-color: var(--verde); }
+  .marca strong { font-weight: 500; font-size: 14px; display: block; }
+  .marca span { font-size: 13px; color: var(--tinta-2); }
+  .marca.desligada { opacity: .5; }
+  .juntar { margin-top: 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+  .juntar .progresso { margin-top: 0; flex: 1 1 260px; }
+
+  /* Resultado */
+  .resumo { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-bottom: 18px; }
+  .resumo div { font-size: 13px; color: var(--tinta-2); }
+  .resumo b { display: block; font-size: 22px; color: var(--tinta); font-weight: 700; line-height: 1.2; }
+  .aviso { border-left: 3px solid var(--ambar); background: var(--ambar-fundo); padding: 10px 14px; font-size: 13px; margin-bottom: 12px; border-radius: 0 4px 4px 0; }
+  .aviso.erro { border-color: var(--erro); background: var(--erro-fundo); color: var(--erro); }
+  .aviso.ok { border-color: var(--verde); background: var(--verde-claro); }
+  .aviso ul { margin: 6px 0 0; padding-left: 18px; }
+  .aviso p { margin: 0; }
+  details.relatorio { margin-bottom: 16px; font-size: 13px; }
+  details.relatorio summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+  details.relatorio table { margin-top: 8px; }
+  .desatualizado { font-size: 13px; color: var(--ambar); font-weight: 500; margin-bottom: 12px; }
+
+  .abas { display: flex; gap: 2px; overflow-x: auto; border-bottom: 1px solid var(--linha); }
+  .abas button { background: var(--linha-2); border: 1px solid var(--linha); border-bottom: 0; padding: 7px 12px; font: 500 13px var(--fonte); color: var(--tinta-2); cursor: pointer; border-radius: 3px 3px 0 0; white-space: nowrap; }
+  .abas button[aria-selected="true"] { background: var(--folha); color: var(--tinta); position: relative; top: 1px; }
+
+  .grade { overflow: auto; max-height: 360px; border: 1px solid var(--linha); border-top: 0; }
+  table { border-collapse: collapse; font-size: 13px; width: 100%; }
+  th, td { border: 1px solid var(--linha-2); padding: 6px 10px; text-align: left; white-space: nowrap; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+  thead th { position: sticky; top: 0; background: #EDF1EE; font-weight: 600; z-index: 1; }
+  td.num { text-align: right; }
+  th.linha, td.linha { color: var(--tinta-3); background: #F6F8F6; text-align: right; font-weight: 400; width: 1%; }
+  .nota-grade { font-size: 12px; color: var(--tinta-3); margin-top: 6px; }
+
+  .exportar { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--linha-2); }
+  .exportar label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+  .campo { display: flex; flex-wrap: wrap; gap: 10px; }
+  .entrada { display: flex; flex: 1 1 300px; border: 1px solid var(--linha); border-radius: 4px; background: var(--folha); overflow: hidden; }
+  .entrada:focus-within { border-color: var(--verde); box-shadow: 0 0 0 1px var(--verde); }
+  .entrada input { flex: 1; min-width: 0; border: 0; padding: 10px 12px; font: 15px var(--fonte); color: var(--tinta); background: transparent; outline: none; }
+  .entrada span { padding: 10px 12px; color: var(--tinta-3); background: #F6F8F6; border-left: 1px solid var(--linha-2); font-size: 14px; }
+  .dica { font-size: 12px; color: var(--tinta-3); margin-top: 6px; }
+
+  .vazio { color: var(--tinta-2); font-size: 14px; margin: 0; }
+  footer { font-size: 12px; color: var(--tinta-3); margin-top: 28px; }
+
+  @media (max-width: 640px) {
+    .pagina { padding-top: 24px; }
+    h1 { font-size: 25px; }
+    .modos { grid-template-columns: 1fr; }
+    .corpo { padding: 16px; }
+    .etapa > .cab { padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="pagina">
+  <header>
+    <h1>Junta Planilhas</h1>
+    <p class="sub">Une arquivos Excel e CSV casando as colunas pelo nome, mesmo quando estão em ordem diferente. Tudo roda no seu computador; nenhum arquivo é enviado.</p>
+  </header>
+
+  <section class="etapa" aria-labelledby="t1">
+    <div class="cab"><span class="num">1</span><h2 id="t1">Arquivos</h2><span class="extra" id="contagem"></span></div>
+    <div class="corpo">
+      <label class="soltar" id="soltar">
+        <strong>Arraste os arquivos para cá</strong>
+        <span>.xlsx, .xls ou .csv, quantos quiser</span><br>
+        <span class="botao">Escolher arquivos</span>
+        <input type="file" id="entradaArquivos" multiple accept=".xlsx,.xls,.xlsm,.csv,.txt">
+      </label>
+      <div class="progresso" id="progCarga" hidden aria-live="polite">
+        <div class="topo"><span class="rotulo" id="progCargaRotulo"></span><span class="pct" id="progCargaPct">0%</span></div>
+        <div class="celulas" id="progCargaCelulas" role="progressbar" aria-valuemin="0" aria-valuemax="100"></div>
+      </div>
+      <div id="erroCarga"></div>
+      <ul class="lista" id="lista" hidden></ul>
+      <div class="acoes-lista" id="acoesLista" hidden>
+        <span id="totalLinhas"></span>
+        <button class="link" id="limpar" type="button">Remover todos</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="etapa" aria-labelledby="t2">
+    <div class="cab"><span class="num">2</span><h2 id="t2">Como juntar</h2></div>
+    <div class="corpo">
+      <div class="modos" role="radiogroup" aria-label="Modo de junção">
+        <label class="modo"><input type="radio" name="modo" value="empilhar" checked>
+          <strong>Tudo numa aba só</strong><span>Empilha todas as linhas, alinhando as colunas pelo nome.</span></label>
+        <label class="modo"><input type="radio" name="modo" value="porAba">
+          <strong>Juntar abas de mesmo nome</strong><span>"Vendas" de cada arquivo vira uma aba "Vendas" única.</span></label>
+        <label class="modo"><input type="radio" name="modo" value="separado">
+          <strong>Uma aba por origem</strong><span>Cada aba de cada arquivo vira uma aba no arquivo final.</span></label>
+      </div>
+      <div class="marcas">
+        <label class="marca"><input type="checkbox" id="opUsarCab" checked>
+          <span><strong>A primeira linha com dados é o cabeçalho</strong><span>Linhas de título acima dele são ignoradas. Desmarcado, as colunas são juntadas pela posição.</span></span></label>
+        <label class="marca" id="marcaFlex"><input type="checkbox" id="opFlex" checked>
+          <span><strong>Casar colunas ignorando maiúsculas, acentos e espaços</strong><span>"Preço", "preco" e "PREÇO " viram a mesma coluna.</span></span></label>
+        <label class="marca" id="marcaRep"><input type="checkbox" id="opRepetidos" checked>
+          <span><strong>Remover cabeçalhos repetidos no meio dos dados</strong><span>Comum quando uma planilha já foi colada em cima de outra.</span></span></label>
+        <label class="marca"><input type="checkbox" id="opOrigem">
+          <span><strong>Adicionar colunas de origem</strong><span>Cria "Arquivo Origem" (e "Aba Origem", se houver arquivos com várias abas) no começo de cada linha.</span></span></label>
+      </div>
+      <div class="juntar">
+        <button class="botao primario" id="botaoJuntar" type="button" disabled>Juntar arquivos</button>
+        <div class="progresso" id="progJunta" hidden aria-live="polite">
+          <div class="topo"><span class="rotulo">Juntando</span><span class="pct" id="progJuntaPct">0%</span></div>
+          <div class="celulas" id="progJuntaCelulas" role="progressbar" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+      </div>
+      <div id="erroJunta"></div>
+    </div>
+  </section>
+
+  <section class="etapa" aria-labelledby="t3">
+    <div class="cab"><span class="num">3</span><h2 id="t3">Resultado</h2></div>
+    <div class="corpo" id="resultado">
+      <p class="vazio">Carregue os arquivos e clique em "Juntar arquivos" para ver a prévia aqui.</p>
+    </div>
+  </section>
+
+  <footer>Arquivos muito grandes podem deixar o navegador lento: o limite prático fica em algumas centenas de MB, conforme a memória do computador. Abas com mais de 1.048.576 linhas são divididas automaticamente.</footer>
+</div>
+
+<script>/*__SHEETJS__*/</script>
+<script>/*__NUCLEO__*/</script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fmtInt = (n) => n.toLocaleString('pt-BR');
+  const pausa = () => new Promise((r) => setTimeout(r, 0));
+  const quadro = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+
+  function fmtTamanho(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1).replace('.', ',') + ' KB';
+    return (b / 1048576).toFixed(1).replace('.', ',') + ' MB';
+  }
+  function dataHoje() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  const estado = {
+    arquivos: [],        // {id, nome, tamanho, file, status, progresso, abas, erro}
+    fila: [],
+    lendo: false,
+    lote: new Set(),     // ids do carregamento em andamento (para a barra geral)
+    resultado: null,
+    desatualizado: false,
+    abaPrevia: 0,
+    juntando: false,
+    nomeSaida: `planilha_unificada_${dataHoje()}`,
+  };
+
+  /* ---------- Barra de células ---------- */
+  function montarCelulas(el) { el.innerHTML = '<i><b></b></i>'.repeat(25); }
+  function pintarCelulas(el, pct) {
+    const cel = el.children;
+    const preenchido = (pct / 100) * cel.length;
+    for (let i = 0; i < cel.length; i++) {
+      const f = Math.max(0, Math.min(1, preenchido - i));
+      cel[i].firstChild.style.transform = `scaleX(${f})`;
+    }
+    el.setAttribute('aria-valuenow', Math.round(pct));
+  }
+  montarCelulas($('progCargaCelulas'));
+  montarCelulas($('progJuntaCelulas'));
+
+  /* ---------- Carregamento ---------- */
+  function adicionarArquivos(lista) {
+    const validos = Array.from(lista).filter((f) => /\.(xlsx|xlsm|xls|csv|txt)$/i.test(f.name));
+    const ignorados = lista.length - validos.length;
+    $('erroCarga').innerHTML = ignorados
+      ? `<div class="aviso" style="margin-top:14px">${ignorados} arquivo(s) ignorado(s): use .xlsx, .xls ou .csv.</div>` : '';
+    if (!validos.length) return;
+    if (!estado.lendo) estado.lote.clear();
+    for (const f of validos) {
+      const a = { id: Math.random().toString(36).slice(2), nome: f.name, tamanho: f.size, file: f, status: 'fila', progresso: 0, abas: [], erro: '' };
+      estado.arquivos.push(a);
+      estado.fila.push(a);
+      estado.lote.add(a.id);
+    }
+    marcarDesatualizado();
+    renderArquivos();
+    processarFila();
+  }
+
+  function lerComProgresso(a) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onprogress = (e) => {
+        if (e.lengthComputable) { a.progresso = (e.loaded / e.total) * 85; atualizarProgresso(); }
+      };
+      r.onload = () => resolve(r.result);
+      r.onerror = () => reject(new Error('Não foi possível ler o arquivo. Ele pode estar aberto em outro programa.'));
+      r.readAsArrayBuffer(a.file);
+    });
+  }
+
+  async function processarFila() {
+    if (estado.lendo) return;
+    estado.lendo = true;
+    while (estado.fila.length) {
+      const a = estado.fila.shift();
+      if (!estado.arquivos.includes(a)) continue; // removido enquanto esperava
+      a.status = 'lendo';
+      renderArquivos();
+      try {
+        const buf = await lerComProgresso(a);
+        a.status = 'processando';
+        a.progresso = 90;
+        renderArquivos();
+        await quadro(); // deixa a barra aparecer antes de interpretar
+        a.abas = Nucleo.interpretar(a.nome, buf);
+        a.status = 'ok';
+      } catch (e) {
+        a.status = 'erro';
+        a.erro = e && e.message ? e.message : 'Arquivo inválido ou corrompido.';
+      }
+      a.progresso = 100;
+      a.file = null;
+      renderArquivos();
+      await pausa();
+    }
+    estado.lendo = false;
+    renderArquivos();
+  }
+
+  function atualizarProgresso() {
+    const lote = estado.arquivos.filter((a) => estado.lote.has(a.id));
+    const caixa = $('progCarga');
+    if (!lote.length) { caixa.hidden = true; return; }
+    const total = lote.reduce((s, a) => s + Math.max(a.tamanho, 1), 0);
+    const feito = lote.reduce((s, a) => s + Math.max(a.tamanho, 1) * (a.progresso / 100), 0);
+    const pct = Math.min(100, (feito / total) * 100);
+    const prontos = lote.filter((a) => a.status === 'ok' || a.status === 'erro').length;
+    const atual = lote.find((a) => a.status === 'lendo' || a.status === 'processando');
+    caixa.hidden = false;
+    $('progCargaPct').textContent = Math.floor(pct) + '%';
+    $('progCargaRotulo').textContent = atual
+      ? `${atual.status === 'processando' ? 'Processando' : 'Lendo'} ${atual.nome} (${prontos + 1} de ${lote.length})`
+      : `${prontos} de ${lote.length} arquivo(s) carregado(s)`;
+    pintarCelulas($('progCargaCelulas'), pct);
+    // atualiza as barras finas sem redesenhar a lista
+    for (const a of lote) {
+      const b = document.querySelector(`[data-barra="${a.id}"]`);
+      if (b) b.style.width = a.progresso + '%';
+    }
+  }
+
+  function renderArquivos() {
+    const ul = $('lista');
+    const arqs = estado.arquivos;
+    ul.hidden = !arqs.length;
+    $('acoesLista').hidden = !arqs.length;
+    ul.innerHTML = arqs.map((a) => {
+      let info;
+      if (a.status === 'ok') {
+        const linhas = a.abas.reduce((s, x) => s + x.aoa.length, 0);
+        const nomes = a.abas.map((x) => x.nome);
+        info = `${fmtTamanho(a.tamanho)}, ${fmtInt(linhas)} linhas, ${a.abas.length === 1 ? '1 aba' : a.abas.length + ' abas'}: ${esc(nomes.slice(0, 4).join(', '))}${nomes.length > 4 ? ` e mais ${nomes.length - 4}` : ''}`;
+      } else if (a.status === 'erro') info = esc(a.erro);
+      else if (a.status === 'fila') info = `${fmtTamanho(a.tamanho)}, na fila`;
+      else if (a.status === 'lendo') info = `${fmtTamanho(a.tamanho)}, lendo`;
+      else info = `${fmtTamanho(a.tamanho)}, processando`;
+      const barra = a.status === 'ok' || a.status === 'erro' ? '' : `<div class="fina"><b data-barra="${a.id}" style="width:${a.progresso}%"></b></div>`;
+      return `<li>
+        <span class="nome" title="${esc(a.nome)}">${esc(a.nome)}</span>
+        <button class="link remover" type="button" data-remover="${a.id}" aria-label="Remover ${esc(a.nome)}">Remover</button>
+        <span class="info${a.status === 'erro' ? ' erro' : ''}">${info}</span>${barra}
+      </li>`;
+    }).join('');
+    const ok = arqs.filter((a) => a.status === 'ok');
+    $('contagem').textContent = arqs.length ? `${ok.length} de ${arqs.length} prontos` : '';
+    const linhas = ok.reduce((s, a) => s + a.abas.reduce((t, x) => t + x.aoa.length, 0), 0);
+    $('totalLinhas').textContent = ok.length ? `${fmtInt(linhas)} linhas no total, contando cabeçalhos` : '';
+    atualizarProgresso();
+    atualizarBotaoJuntar();
+  }
+
+  $('lista').addEventListener('click', (e) => {
+    const id = e.target.getAttribute('data-remover');
+    if (!id) return;
+    estado.arquivos = estado.arquivos.filter((a) => a.id !== id);
+    estado.lote.delete(id);
+    marcarDesatualizado();
+    renderArquivos();
+  });
+  $('limpar').addEventListener('click', () => {
+    estado.arquivos = []; estado.fila = []; estado.lote.clear();
+    estado.resultado = null; estado.desatualizado = false;
+    $('erroCarga').innerHTML = '';
+    renderArquivos(); renderResultado();
+  });
+
+  const zona = $('soltar');
+  $('entradaArquivos').addEventListener('change', (e) => { adicionarArquivos(e.target.files); e.target.value = ''; });
+  ['dragenter', 'dragover'].forEach((t) => zona.addEventListener(t, (e) => { e.preventDefault(); zona.classList.add('ativa'); }));
+  ['dragleave', 'drop'].forEach((t) => zona.addEventListener(t, () => zona.classList.remove('ativa')));
+  zona.addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfer.files.length) adicionarArquivos(e.dataTransfer.files); });
+  // Evita que o navegador abra o arquivo se ele for solto fora da área
+  window.addEventListener('dragover', (e) => e.preventDefault());
+  window.addEventListener('drop', (e) => e.preventDefault());
+
+  /* ---------- Opções ---------- */
+  function lerOpcoes() {
+    return {
+      modo: document.querySelector('input[name="modo"]:checked').value,
+      usarCab: $('opUsarCab').checked,
+      flex: $('opFlex').checked,
+      removerRepetidos: $('opRepetidos').checked,
+      origem: $('opOrigem').checked,
+    };
+  }
+  function sincronizarOpcoes() {
+    const cab = $('opUsarCab').checked;
+    for (const [marca, input] of [['marcaFlex', 'opFlex'], ['marcaRep', 'opRepetidos']]) {
+      $(marca).classList.toggle('desligada', !cab);
+      $(input).disabled = !cab;
+    }
+  }
+  document.querySelectorAll('input[name="modo"], .marcas input').forEach((el) =>
+    el.addEventListener('change', () => { sincronizarOpcoes(); marcarDesatualizado(); }));
+  sincronizarOpcoes();
+
+  function marcarDesatualizado() {
+    if (estado.resultado && !estado.desatualizado) { estado.desatualizado = true; renderResultado(); }
+  }
+  function atualizarBotaoJuntar() {
+    const ok = estado.arquivos.some((a) => a.status === 'ok');
+    $('botaoJuntar').disabled = !ok || estado.lendo || estado.juntando;
+    $('botaoJuntar').textContent = estado.lendo ? 'Aguardando o carregamento' : estado.juntando ? 'Juntando' : 'Juntar arquivos';
+  }
+
+  /* ---------- Junção ---------- */
+  $('botaoJuntar').addEventListener('click', async () => {
+    const op = lerOpcoes();
+    const arqs = estado.arquivos.filter((a) => a.status === 'ok');
+    if (!arqs.length) return;
+    estado.juntando = true;
+    atualizarBotaoJuntar();
+    $('erroJunta').innerHTML = '';
+    $('progJunta').hidden = false;
+    const pintar = (f) => { const p = f * 100; $('progJuntaPct').textContent = Math.floor(p) + '%'; pintarCelulas($('progJuntaCelulas'), p); };
+    pintar(0);
+    try {
+      estado.resultado = await Nucleo.montarResultado(arqs, op.modo, op, pintar);
+      estado.desatualizado = false;
+      estado.abaPrevia = 0;
+      renderResultado();
+      setTimeout(() => { $('progJunta').hidden = true; }, 900);
+      $('t3').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    } catch (e) {
+      $('progJunta').hidden = true;
+      $('erroJunta').innerHTML = `<div class="aviso erro" style="margin-top:14px">${esc(e.message || 'Não foi possível juntar os arquivos.')}</div>`;
+    } finally {
+      estado.juntando = false;
+      atualizarBotaoJuntar();
+    }
+  });
+
+  /* ---------- Resultado ---------- */
+  function fmtCelula(v) {
+    if (v instanceof Date) return isNaN(v) ? '' : v.toLocaleDateString('pt-BR');
+    if (typeof v === 'number') return v.toLocaleString('pt-BR', { maximumFractionDigits: 6 });
+    if (typeof v === 'boolean') return v ? 'VERDADEIRO' : 'FALSO';
+    return String(v ?? '');
+  }
+
+  function renderResultado() {
+    const alvo = $('resultado');
+    const r = estado.resultado;
+    if (!r) { alvo.innerHTML = '<p class="vazio">Carregue os arquivos e clique em "Juntar arquivos" para ver a prévia aqui.</p>'; return; }
+    const aba = r.abas[estado.abaPrevia] || r.abas[0];
+    const colunas = aba.aoa[0] || [];
+
+    const ausentes = aba.relatorio.filter((c) => c.ausentesEm.length);
+    const variantes = aba.relatorio.filter((c) => c.variantes.length > 1);
+
+    let html = '';
+    if (estado.desatualizado) html += '<p class="desatualizado">Arquivos ou opções mudaram depois da última junção. Clique em "Juntar arquivos" de novo para atualizar.</p>';
+
+    html += `<div class="resumo">
+      <div><b>${fmtInt(r.totalLinhas)}</b>linhas de dados</div>
+      <div><b>${r.abas.length}</b>${r.abas.length === 1 ? 'aba' : 'abas'} no arquivo final</div>
+      <div><b>${fmtInt(colunas.length)}</b>colunas em "${esc(aba.nome)}"</div>
+    </div>`;
+
+    if (r.avisos.length) html += `<div class="aviso"><p><strong>Para conferir</strong></p><ul>${r.avisos.map((a) => `<li>${esc(a)}</li>`).join('')}</ul></div>`;
+
+    if (aba.totalFontes > 1) {
+      if (!ausentes.length) html += `<div class="aviso ok"><p>Todas as colunas de "${esc(aba.nome)}" existem em todas as ${aba.totalFontes} origens.</p></div>`;
+      else {
+        html += `<details class="relatorio" open><summary>${ausentes.length} coluna(s) não existem em todas as origens: essas células ficam em branco</summary>
+          <div class="grade" style="border-top:1px solid var(--linha);max-height:220px"><table><thead><tr><th>Coluna</th><th>Não existe em</th></tr></thead><tbody>
+          ${ausentes.map((c) => `<tr><td>${esc(c.rotulo)}</td><td title="${esc(c.ausentesEm.join(', '))}">${esc(c.ausentesEm.join(', '))}</td></tr>`).join('')}
+          </tbody></table></div></details>`;
+      }
+      if (variantes.length) {
+        html += `<details class="relatorio"><summary>${variantes.length} coluna(s) unificadas com grafias diferentes</summary>
+          <div class="grade" style="border-top:1px solid var(--linha);max-height:220px"><table><thead><tr><th>Coluna final</th><th>Nomes encontrados</th></tr></thead><tbody>
+          ${variantes.map((c) => `<tr><td>${esc(c.rotulo)}</td><td>${c.variantes.map((v) => `"${esc(v)}"`).join(', ')}</td></tr>`).join('')}
+          </tbody></table></div></details>`;
+      }
+    }
+
+    if (r.abas.length > 1) {
+      html += `<div class="abas" role="tablist">${r.abas.map((a, i) =>
+        `<button type="button" role="tab" data-aba="${i}" aria-selected="${i === estado.abaPrevia}">${esc(a.nome)}</button>`).join('')}</div>`;
+    }
+    const linhas = aba.aoa.slice(1, 11);
+    html += `<div class="grade" ${r.abas.length > 1 ? '' : 'style="border-top:1px solid var(--linha)"'}><table>
+      <thead><tr><th class="linha">#</th>${colunas.map((c) => `<th title="${esc(c)}">${esc(c)}</th>`).join('')}</tr></thead>
+      <tbody>${linhas.length ? linhas.map((l, i) => `<tr><td class="linha">${i + 1}</td>${colunas.map((_, j) => {
+        const v = l[j];
+        const t = fmtCelula(v);
+        return `<td${typeof v === 'number' ? ' class="num"' : ''} title="${esc(t)}">${esc(t)}</td>`;
+      }).join('')}</tr>`).join('') : `<tr><td colspan="${colunas.length + 1}">Esta aba não tem linhas de dados.</td></tr>`}</tbody>
+    </table></div>
+    <p class="nota-grade">Prévia das ${Math.min(10, aba.linhas)} primeiras de ${fmtInt(aba.linhas)} linhas.</p>`;
+
+    html += `<div class="exportar">
+      <label for="nomeSaida">Nome do arquivo</label>
+      <div class="campo">
+        <div class="entrada"><input id="nomeSaida" type="text" autocomplete="off" spellcheck="false" value="${esc(estado.nomeSaida)}"><span>.xlsx</span></div>
+        <button class="botao primario" id="baixar" type="button" ${estado.desatualizado ? 'disabled' : ''}>Baixar planilha</button>
+      </div>
+      <p class="dica" id="dicaNome">${estado.desatualizado ? 'Junte de novo antes de baixar.' : 'Caracteres como / \\ : * ? " < > | são trocados por _.'}</p>
+    </div>`;
+
+    alvo.innerHTML = html;
+
+    alvo.querySelectorAll('[data-aba]').forEach((b) => b.addEventListener('click', () => {
+      estado.abaPrevia = Number(b.dataset.aba); renderResultado();
+      const sel = alvo.querySelector(`[data-aba="${estado.abaPrevia}"]`); sel && sel.focus();
+    }));
+    const campo = $('nomeSaida');
+    campo.addEventListener('input', () => { estado.nomeSaida = campo.value; });
+    campo.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('baixar').click(); });
+    $('baixar').addEventListener('click', baixar);
+  }
+
+  async function baixar() {
+    const r = estado.resultado;
+    if (!r || estado.desatualizado) return;
+    const nome = Nucleo.nomeArquivoSeguro(estado.nomeSaida, `planilha_unificada_${dataHoje()}`);
+    const botao = $('baixar');
+    botao.disabled = true;
+    botao.textContent = 'Gerando arquivo';
+    await quadro();
+    try {
+      const wb = Nucleo.gerarWorkbook(r);
+      XLSX.writeFile(wb, nome, { compression: true });
+      $('dicaNome').textContent = `Planilha baixada: ${nome}`;
+    } catch (e) {
+      $('dicaNome').textContent = 'Não foi possível gerar o arquivo: ' + (e.message || 'erro desconhecido');
+    } finally {
+      botao.disabled = false;
+      botao.textContent = 'Baixar planilha';
+    }
+  }
+})();
+</script>
+</body>
+</html>

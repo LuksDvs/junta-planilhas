@@ -1,0 +1,12 @@
+{
+  "name": "junta-planilhas",
+  "version": "1.0.0",
+  "description": "Une arquivos Excel e CSV casando as colunas pelo nome, direto no navegador, sem enviar arquivos a nenhum servidor.",
+  "private": true,
+  "scripts": {
+    "build": "node build.js"
+  },
+  "dependencies": {
+    "xlsx": "0.18.5"
+  }
+}
